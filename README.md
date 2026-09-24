@@ -4,9 +4,12 @@ An AI-powered agent that reads Jira tickets, generates BigQuery validation queri
 
 ## Launch video
 
-[![Watch the TraceGuard launch video](media/traceguard-launch-poster.jpg)](media/traceguard-launch.mp4)
+<video controls preload="metadata" width="100%" poster="https://github.com/deolsahil/traceguard-data-validation-agent/raw/refs/heads/main/media/traceguard-launch-poster.jpg">
+  <source src="https://github.com/deolsahil/traceguard-data-validation-agent/raw/refs/heads/main/media/traceguard-launch.mp4" type="video/mp4">
+  <a href="https://github.com/deolsahil/traceguard-data-validation-agent/raw/refs/heads/main/media/traceguard-launch.mp4">Play or download the TraceGuard launch video</a>
+</video>
 
-[Watch the full launch video](media/traceguard-launch.mp4) — it shows the request-to-evidence workflow, the approval gate, the working agent, and the efficiency gains from automating repetitive validation work.
+If your GitHub client does not render inline media, [open the MP4 directly](https://github.com/deolsahil/traceguard-data-validation-agent/raw/refs/heads/main/media/traceguard-launch.mp4). It shows the request-to-evidence workflow, the approval gate, the working agent, and the efficiency gains from automating repetitive validation work.
 
 ## How it works
 
