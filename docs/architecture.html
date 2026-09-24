@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TraceGuard Validation — Architecture</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230052cc'/><line x1='16' y1='4' x2='16' y2='9' stroke='%23fff' stroke-width='2.4' stroke-linecap='round'/><circle cx='16' cy='4' r='1.9' fill='%23fff'/><rect x='6.5' y='9' width='19' height='16' rx='4.5' fill='%23fff'/><circle cx='12' cy='15.5' r='2.3' fill='%230052cc'/><circle cx='20' cy='15.5' r='2.3' fill='%230052cc'/><line x1='12.5' y1='20.5' x2='19.5' y2='20.5' stroke='%230052cc' stroke-width='2.2' stroke-linecap='round'/></svg>">
+<style>
+:root {
+  --font: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --text: #172b4d;
+  --muted: #6b778c;
+  --border: #dfe1e6;
+  --bg: #f0f2f5;
+  --white: #fff;
+  --blue: #0052cc;
+  --blue-light: #eaf1ff;
+  --green: #00875a;
+  --green-light: #dcfce7;
+  --orange: #ff8b00;
+  --r: 10px;
+  --shadow: 0 1px 3px rgba(9,30,66,.1), 0 0 1px rgba(9,30,66,.07);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font); color: var(--text); background: var(--bg); font-size: 14px; line-height: 1.6; }
+main { width: min(1200px, calc(100% - 48px)); margin: 28px auto 80px; }
+
+header {
+  padding: 32px 36px 30px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #0b1e47 0%, #0052cc 65%, #2684ff 100%);
+  color: #fff;
+  margin-bottom: 28px;
+  box-shadow: 0 6px 24px rgba(0,82,204,.28);
+}
+.header-eyebrow { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; opacity: .55; margin-bottom: 8px; }
+header h1 { font-size: 28px; font-weight: 700; letter-spacing: -.3px; margin-bottom: 6px; }
+header p { font-size: 14px; opacity: .7; }
+.nav-link {
+  display: inline-block; margin-top: 16px;
+  background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.3);
+  color: #fff; text-decoration: none; padding: 7px 18px; border-radius: 6px;
+  font-size: 13px; font-weight: 600; transition: background .15s;
+}
+.nav-link:hover { background: rgba(255,255,255,.25); }
+
+h2 { font-size: 20px; font-weight: 700; margin-bottom: 16px; color: var(--text); }
+.section { background: var(--white); border: 1px solid var(--border); border-radius: var(--r); padding: 28px 32px; margin-bottom: 20px; box-shadow: var(--shadow); }
+.section-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 8px; }
+
+/* Problem cards */
+.problem-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-top: 16px; }
+.problem-card { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+.problem-card .icon { font-size: 24px; margin-bottom: 8px; }
+.problem-card h4 { font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+.problem-card p { font-size: 12px; color: var(--muted); }
+
+/* Flow diagrams */
+.flows { display: grid; grid-template-columns: 1fr; gap: 20px; }
+.flow-box { background: var(--bg); border-radius: 10px; padding: 20px; }
+.flow-box.v1 { border-top: 3px solid #b3bac5; }
+.flow-box.v2 { border-top: 3px solid var(--blue); }
+.flow-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 14px; }
+.flow-title.v1 { color: var(--muted); }
+.flow-title.v2 { color: var(--blue); }
+.flow-step {
+  display: flex; align-items: flex-start; gap: 10px;
+  background: var(--white); border: 1px solid var(--border); border-radius: 7px;
+  padding: 10px 13px; font-size: 12px; font-weight: 600;
+}
+.flow-step.removed { background: #fff5f5; border-color: #fecaca; color: #9d1c1c; text-decoration: line-through; opacity: .6; }
+.flow-step.new     { background: #f0fdf4; border-color: #86efac; color: #006644; }
+.flow-step.kept    { background: #f8f9ff; border-color: #c7d2fe; color: #3730a3; }
+.flow-arrow { text-align: center; color: var(--muted); font-size: 16px; margin: 2px 0; line-height: 1; }
+.step-tag {
+  font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+  padding: 1px 5px; border-radius: 3px; white-space: nowrap; margin-top: 1px;
+}
+.tag-new     { background: #dcfce7; color: #006644; }
+.tag-removed { background: #fee2e2; color: #9d1c1c; }
+.tag-kept    { background: #e0e7ff; color: #3730a3; }
+.step-body { flex: 1; }
+.step-sub { font-size: 10px; font-weight: 400; color: var(--muted); margin-top: 2px; }
+
+/* Comparison table */
+.compare-table { width: 100%; border-collapse: collapse; margin-top: 4px; }
+.compare-table th, .compare-table td { padding: 10px 14px; text-align: left; font-size: 13px; border-bottom: 1px solid var(--border); }
+.compare-table th { background: #f4f5f7; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.compare-table td:first-child { font-weight: 600; color: var(--muted); font-size: 12px; width: 200px; }
+.compare-table .v1-col { color: #6b778c; }
+.compare-table .v2-col { color: var(--green); font-weight: 600; }
+.compare-table tr:last-child td { border-bottom: none; }
+
+/* Feature cards */
+.features { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-top: 4px; }
+.feature-card { border: 1px solid var(--border); border-radius: 9px; padding: 18px; background: var(--white); }
+.feature-card .f-icon { font-size: 26px; margin-bottom: 10px; }
+.feature-card h4 { font-size: 14px; font-weight: 700; margin-bottom: 6px; }
+.feature-card p { font-size: 12px; color: var(--muted); line-height: 1.5; }
+.feature-card .f-detail {
+  margin-top: 10px; font-size: 11px; background: var(--bg);
+  border-radius: 5px; padding: 8px 10px; font-family: ui-monospace, monospace;
+  color: var(--text); border: 1px solid var(--border); white-space: pre;
+}
+.fc-blue   { border-top: 3px solid var(--blue); }
+.fc-green  { border-top: 3px solid var(--green); }
+.fc-orange { border-top: 3px solid var(--orange); }
+.fc-purple { border-top: 3px solid #7c3aed; }
+
+/* State machine */
+.states { display: flex; gap: 0; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+.state-box {
+  border: 2px solid var(--border); border-radius: 8px; padding: 12px 16px;
+  font-size: 12px; font-weight: 700; background: var(--white); min-width: 140px; text-align: center;
+}
+.state-arrow { font-size: 20px; color: var(--muted); padding: 0 6px; }
+.s-pending  { border-color: #b3bac5; color: var(--muted); }
+.s-waiting  { border-color: var(--orange); color: var(--orange); background: #fff8ed; }
+.s-approved { border-color: var(--blue); color: var(--blue); background: var(--blue-light); }
+.s-passed   { border-color: var(--green); color: var(--green); background: var(--green-light); }
+.state-sub  { font-size: 10px; font-weight: 400; color: var(--muted); margin-top: 3px; }
+
+/* Storage section */
+.storage-card { border: 1px solid var(--border); border-radius: 10px; padding: 20px; background: var(--white); }
+.storage-card h4 { font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+.s-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; padding: 2px 8px; border-radius: 20px; display: inline-block; margin-bottom: 10px; }
+.s-dev  { background: #e8edf3; color: var(--muted); }
+.s-prod { background: #dcfce7; color: var(--green); }
+.storage-card ul { list-style: none; padding: 0; }
+.storage-card ul li { font-size: 12px; color: var(--muted); padding: 3px 0 3px 14px; position: relative; }
+.storage-card ul li::before { content: "·"; position: absolute; left: 0; color: var(--blue); font-weight: 700; }
+.prod-badge { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; display: inline-block; margin-bottom: 6px; }
+.badge-pg { background: #e0f2fe; color: #0369a1; }
+.badge-bq { background: #fef3c7; color: #92400e; }
+
+
+  .fd-root {
+    --ink:#101418; --mid:#5b6470; --hair:#dfe3e8; --bg:#fbfcfd;
+    --jira:#0052cc; --run:#1a73e8; --gem:#7c4dff; --bq:#0f9d58; --gate:#c2700a;
+    --lane1:#fff7f0; --lane2:#f3f8ff; --lane3:#f8f4ff; --lane4:#f1faf4;
+  }
+  *{box-sizing:border-box;margin:0}
+  .wrap{max-width:1180px;margin:0 auto}
+  h1{font-size:23px;font-weight:750;letter-spacing:-.35px}
+  .sub{color:var(--mid);font-size:13.5px;margin-top:6px;max-width:78ch}
+  code,.fd-mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+
+  /* Overview pipeline: flex row, so the arrows sit BETWEEN cards and cannot collide */
+  .fd-pipe{display:flex;align-items:stretch;gap:0;margin-top:24px;flex-wrap:wrap}
+  .fd-stage{flex:1 1 0;min-width:158px;background:#fff;border:1px solid var(--hair);
+    border-radius:12px;padding:14px 14px 15px}
+  .fd-shead{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}
+  .fd-snum{font:700 10.5px/1 ui-monospace,monospace;color:#fff;background:var(--mid);
+    width:19px;height:19px;border-radius:50%;display:grid;place-items:center}
+  .fd-stitle{font-size:12.5px;font-weight:750;letter-spacing:-.1px}
+  .fd-ssub{font-size:10.5px;color:var(--mid);margin-top:4px;line-height:1.45}
+  .fd-chev{flex:0 0 30px;display:grid;place-items:center;color:#c3c9d1}
+  .fd-chev svg{display:block}
+  .fd-stage.fd-s-gate{background:#fff8ec;border-color:#eccf9c}
+  .fd-s-gate .fd-snum{background:var(--gate)} .fd-s-gate .fd-stitle{color:var(--gate)}
+  .fd-s-gate .fd-ssub{color:#8a5f14}
+  .fd-stage.fd-s-exec{border-color:#a8dcbd;box-shadow:inset 0 0 0 1px #d6f0e0}
+  .fd-s-exec .fd-snum{background:var(--bq)} .fd-s-exec .fd-stitle{color:var(--bq)}
+  .fd-plabel{font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;
+    color:var(--mid);margin-top:30px}
+
+  /* four lanes; every step bar is positioned by grid, so nothing can overlap */
+  .fd-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin-top:26px;
+    border:1px solid var(--hair);border-radius:14px;overflow:hidden;background:#fff}
+  .fd-lane{padding:16px 16px 14px;border-right:1px solid var(--hair);display:flex;gap:11px;align-items:flex-start}
+  .fd-lane:last-child{border-right:0}
+  .fd-lane:nth-child(1){background:var(--lane1)} .fd-lane:nth-child(2){background:var(--lane2)}
+  .fd-lane:nth-child(3){background:var(--lane3)} .fd-lane:nth-child(4){background:var(--lane4)}
+  .fd-ico{flex:none;display:block}
+  .fd-lname{font-size:13px;font-weight:700;letter-spacing:-.1px}
+  .fd-lmeta{font-size:10.5px;color:var(--mid);margin-top:3px;line-height:1.4}
+  .fd-zone{font-size:9px;font-weight:750;letter-spacing:.9px;text-transform:uppercase;color:var(--mid);margin-bottom:5px}
+
+  .fd-steps{grid-column:1 / -1;background:
+    linear-gradient(90deg,transparent calc(25% - .5px),var(--hair) calc(25% - .5px),var(--hair) 25%,transparent 25%),
+    linear-gradient(90deg,transparent calc(50% - .5px),var(--hair) calc(50% - .5px),var(--hair) 50%,transparent 50%),
+    linear-gradient(90deg,transparent calc(75% - .5px),var(--hair) calc(75% - .5px),var(--hair) 75%,transparent 75%);
+    border-top:1px solid var(--hair);padding:14px 0}
+  .fd-row{display:grid;grid-template-columns:repeat(4,1fr);padding:5px 0}
+  .fd-bar{display:flex;align-items:center;gap:9px;margin:0 14px;min-height:30px}
+  .fd-bar.fd-rev{flex-direction:row-reverse}
+  .fd-num{flex:none;width:21px;height:21px;border-radius:50%;display:grid;place-items:center;
+    font:700 11px/1 ui-monospace,monospace;color:#fff;background:var(--mid)}
+  .fd-line{flex:1;height:2px;background:var(--mid);border-radius:2px;min-width:14px}
+  .fd-head{flex:none;width:0;height:0;border:6px solid transparent;border-left-color:var(--mid)}
+  .fd-bar.fd-rev .fd-head{border-left-color:transparent;border-right-color:var(--mid)}
+  .fd-lab{flex:none;font-size:12px;font-weight:600;color:var(--ink);white-space:nowrap}
+  .fd-bar.fd-single .fd-line{display:none} .fd-bar.fd-single .fd-head{display:none}
+
+  .fd-k-read .fd-num,.fd-k-read .fd-line{background:var(--run)} .fd-k-read .fd-head{border-left-color:var(--run)}
+  .fd-k-read.fd-rev .fd-head{border-right-color:var(--run);border-left-color:transparent}
+  .fd-k-ai .fd-num,.fd-k-ai .fd-line{background:var(--gem)} .fd-k-ai .fd-head{border-left-color:var(--gem)}
+  .fd-k-ai.fd-rev .fd-head{border-right-color:var(--gem);border-left-color:transparent}
+  .fd-k-exec .fd-num,.fd-k-exec .fd-line{background:var(--bq)} .fd-k-exec .fd-head{border-left-color:var(--bq)}
+  .fd-k-exec .fd-line{height:4px} .fd-k-exec .fd-lab{font-weight:750}
+  .fd-k-write .fd-num,.fd-k-write .fd-line{background:var(--mid)}
+  .fd-k-stop .fd-num,.fd-k-stop .fd-line{background:var(--gate)} .fd-k-stop .fd-head{border-left-color:var(--gate)}
+  .fd-k-stop.fd-rev .fd-head{border-right-color:var(--gate);border-left-color:transparent}
+  .fd-k-stop .fd-lab{color:var(--gate)}
+  .fd-k-human .fd-num{background:var(--jira)} .fd-k-human .fd-lab{color:var(--jira)}
+
+  .fd-gate{grid-column:1 / -1;background:#fff8ec;border-top:1px solid #f0d9b0;border-bottom:1px solid #f0d9b0;
+    padding:13px 18px;display:flex;gap:13px;align-items:baseline;flex-wrap:wrap}
+  .fd-gate b{color:var(--gate);font-size:11.5px;letter-spacing:.7px;text-transform:uppercase;white-space:nowrap}
+  .fd-gate span{font-size:12.5px;color:#7a5410}
+  .fd-foot{margin-top:20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px}
+  .fd-fact{border-left:3px solid var(--hair);padding:2px 0 2px 12px}
+  .fd-fact dt{font-size:11px;font-weight:750;letter-spacing:.3px}
+  .fd-fact dd{font-size:11.5px;color:var(--mid);margin-top:3px}
+  @media (max-width:820px){.fd-lab{white-space:normal} body{padding:20px 14px}}
+
+</style>
+</head>
+<body>
+<main>
+
+  <header>
+    <div class="header-eyebrow">TraceGuard · Jira + BigQuery validation</div>
+    <h1>E2E Validation — Architecture</h1>
+    <p>Reads a Jira ticket, works out what to check, writes the SQL, waits for a human to approve it, then runs it in BigQuery and reports back on the ticket.</p>
+    <a href="/" class="nav-link">← Back to Dashboard</a>
+  </header>
+
+  <!-- Problem Statement -->
+  <section class="section">
+    <div class="section-label">The Problem</div>
+    <h2>What Are We Solving?</h2>
+    <div class="problem-grid">
+      <div class="problem-card">
+        <div class="icon">🧩</div>
+        <h4>No Automated Validation</h4>
+        <p>When a BigQuery column, table, or view changed, there was no automated way to verify the change landed correctly in production data.</p>
+      </div>
+      <div class="problem-card">
+        <div class="icon">✍️</div>
+        <h4>High Friction for Engineers</h4>
+        <p>Writing and maintaining validation SQL manually is time-consuming and error-prone — especially across hundreds of tickets and multiple teams.</p>
+      </div>
+      <div class="problem-card">
+        <div class="icon">🔍</div>
+        <h4>No Audit Trail</h4>
+        <p>When a change shipped, there was no shared record of whether it was validated. Stakeholders had no visibility, and compliance had nothing to point to.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Pipeline -->
+  
+
+  
+
+  <section class="section">
+    <div class="section-label">Start here</div>
+    <h2>How it works</h2>
+    <div class="fd-root">
+<div class="fd-plabel">The journey of one ticket</div>
+<div class="fd-pipe"><div class="fd-stage"><div class="fd-shead"><svg class="fd-ico" width="26" height="26" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs><linearGradient id="k1SVGSBI7obaC" x1="98.031%" x2="58.888%" y1=".161%" y2="40.766%"><stop offset="18%" stop-color="#0052cc"/><stop offset="100%" stop-color="#2684ff"/></linearGradient><linearGradient id="k1SVGHifZlbzE" x1="100.665%" x2="55.402%" y1=".455%" y2="44.727%"><stop offset="18%" stop-color="#0052cc"/><stop offset="100%" stop-color="#2684ff"/></linearGradient></defs><path fill="#2684ff" d="M244.658 0H121.707a55.5 55.5 0 0 0 55.502 55.502h22.649V77.37c.02 30.625 24.841 55.447 55.466 55.467V10.666C255.324 4.777 250.55 0 244.658 0"/><path fill="url(#k1SVGSBI7obaC)" d="M183.822 61.262H60.872c.019 30.625 24.84 55.447 55.466 55.467h22.649v21.938c.039 30.625 24.877 55.43 55.502 55.43V71.93c0-5.891-4.776-10.667-10.667-10.667"/><path fill="url(#k1SVGHifZlbzE)" d="M122.951 122.489H0c0 30.653 24.85 55.502 55.502 55.502h22.72v21.867c.02 30.597 24.798 55.408 55.396 55.466V133.156c0-5.891-4.776-10.667-10.667-10.667"/></svg><span class="fd-snum">1</span></div><div class="fd-stitle">Jira ticket</div><div class="fd-ssub">Someone describes the change in plain English</div></div><div class="fd-chev"><svg width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4l9 8-9 8" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="fd-stage"><div class="fd-shead"><svg class="fd-ico" width="26" height="26" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><g fill-rule="evenodd"><path fill="#aecbfa" d="M8.9 2.63L12.02 12h9.36z"/><path fill="#4285f4" d="M21.38 12h-9.36L8.9 21.38zM3.44 21.38l3.13-1.57L8.9 12H5.78z"/><path fill="#aecbfa" d="M3.44 2.63L5.78 12H8.9L6.57 4.19z"/></g></svg><span class="fd-snum">2</span></div><div class="fd-stitle">The agent reads it</div><div class="fd-ssub">Cloud Run Job, woken every 4 hours</div></div><div class="fd-chev"><svg width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4l9 8-9 8" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="fd-stage"><div class="fd-shead"><svg class="fd-ico" width="26" height="26" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="#4285F4" aria-hidden="true"><path d="M11.04 19.32Q12 21.51 12 24q0-2.49.93-4.68.96-2.19 2.58-3.81t3.81-2.55Q21.51 12 24 12q-2.49 0-4.68-.93a12.3 12.3 0 0 1-3.81-2.58 12.3 12.3 0 0 1-2.58-3.81Q12 2.49 12 0q0 2.49-.96 4.68-.93 2.19-2.55 3.81a12.3 12.3 0 0 1-3.81 2.58Q2.49 12 0 12q2.49 0 4.68.96 2.19.93 3.81 2.55t2.55 3.81"/></svg><span class="fd-snum">3</span></div><div class="fd-stitle">Gemini writes SQL</div><div class="fd-ssub">Using the real column names from BigQuery</div></div><div class="fd-chev"><svg width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4l9 8-9 8" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="fd-stage fd-s-gate"><div class="fd-shead"><svg class="fd-ico" width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.6" fill="none" stroke="#0052cc" stroke-width="1.9"/><path d="M5 20c0-3.9 3.1-6.2 7-6.2s7 2.3 7 6.2" fill="none" stroke="#0052cc" stroke-width="1.9" stroke-linecap="round"/></svg><span class="fd-snum">4</span></div><div class="fd-stitle">A person approves</div><div class="fd-ssub">Reviewer replies @agent APPROVED on the ticket</div></div><div class="fd-chev"><svg width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4l9 8-9 8" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="fd-stage fd-s-exec"><div class="fd-shead"><svg class="fd-ico" width="26" height="26" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><g fill-rule="evenodd"><path fill="#aecbfa" d="M6.73 10.83v2.63a4.9 4.9 0 0 0 1.71 1.74v-4.37Z"/><path fill="#669df6" d="M9.89 8.41v7.53A8 8 0 0 0 11 16a8 8 0 0 0 1 0V8.41Z"/><path fill="#aecbfa" d="M13.64 11.86v3.29a5 5 0 0 0 1.7-1.82v-1.47Z"/><path fill="#4285f4" d="m17.74 16.32l-1.42 1.42a.42.42 0 0 0 0 .6l3.54 3.54a.42.42 0 0 0 .59 0l1.43-1.43a.42.42 0 0 0 0-.59l-3.54-3.54a.42.42 0 0 0-.6 0"/><path fill="#669df6" d="M11 2a9 9 0 1 0 9 9a9 9 0 0 0-9-9m0 15.69A6.68 6.68 0 1 1 17.69 11A6.68 6.68 0 0 1 11 17.69"/></g></svg><span class="fd-snum">5</span></div><div class="fd-stitle">BigQuery runs it</div><div class="fd-ssub">The approved SELECT. Read-only, byte-capped</div></div><div class="fd-chev"><svg width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4l9 8-9 8" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="fd-stage"><div class="fd-shead"><svg class="fd-ico" width="26" height="26" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs><linearGradient id="k5SVGSBI7obaC" x1="98.031%" x2="58.888%" y1=".161%" y2="40.766%"><stop offset="18%" stop-color="#0052cc"/><stop offset="100%" stop-color="#2684ff"/></linearGradient><linearGradient id="k5SVGHifZlbzE" x1="100.665%" x2="55.402%" y1=".455%" y2="44.727%"><stop offset="18%" stop-color="#0052cc"/><stop offset="100%" stop-color="#2684ff"/></linearGradient></defs><path fill="#2684ff" d="M244.658 0H121.707a55.5 55.5 0 0 0 55.502 55.502h22.649V77.37c.02 30.625 24.841 55.447 55.466 55.467V10.666C255.324 4.777 250.55 0 244.658 0"/><path fill="url(#k5SVGSBI7obaC)" d="M183.822 61.262H60.872c.019 30.625 24.84 55.447 55.466 55.467h22.649v21.938c.039 30.625 24.877 55.43 55.502 55.43V71.93c0-5.891-4.776-10.667-10.667-10.667"/><path fill="url(#k5SVGHifZlbzE)" d="M122.951 122.489H0c0 30.653 24.85 55.502 55.502 55.502h22.72v21.867c.02 30.597 24.798 55.408 55.396 55.466V133.156c0-5.891-4.776-10.667-10.667-10.667"/></svg><span class="fd-snum">6</span></div><div class="fd-stitle">Answer on the ticket</div><div class="fd-ssub">Pass or fail, with the evidence, plus dashboard</div></div></div>
+
+<div class="fd-plabel">Who calls what, in order</div>
+<div class="fd-grid">
+  <div class="fd-lane"><div><svg class="fd-ico" width="26" height="26" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs><linearGradient id="k6SVGSBI7obaC" x1="98.031%" x2="58.888%" y1=".161%" y2="40.766%"><stop offset="18%" stop-color="#0052cc"/><stop offset="100%" stop-color="#2684ff"/></linearGradient><linearGradient id="k6SVGHifZlbzE" x1="100.665%" x2="55.402%" y1=".455%" y2="44.727%"><stop offset="18%" stop-color="#0052cc"/><stop offset="100%" stop-color="#2684ff"/></linearGradient></defs><path fill="#2684ff" d="M244.658 0H121.707a55.5 55.5 0 0 0 55.502 55.502h22.649V77.37c.02 30.625 24.841 55.447 55.466 55.467V10.666C255.324 4.777 250.55 0 244.658 0"/><path fill="url(#k6SVGSBI7obaC)" d="M183.822 61.262H60.872c.019 30.625 24.84 55.447 55.466 55.467h22.649v21.938c.039 30.625 24.877 55.43 55.502 55.43V71.93c0-5.891-4.776-10.667-10.667-10.667"/><path fill="url(#k6SVGHifZlbzE)" d="M122.951 122.489H0c0 30.653 24.85 55.502 55.502 55.502h22.72v21.867c.02 30.597 24.798 55.408 55.396 55.466V133.156c0-5.891-4.776-10.667-10.667-10.667"/></svg></div><div>
+    <div class="fd-zone">Corporate network</div><div class="fd-lname">Jira</div>
+    <div class="fd-lmeta">The ticket, its comments, and the approval. System of record.</div></div></div>
+  <div class="fd-lane"><div><svg class="fd-ico" width="26" height="26" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><g fill-rule="evenodd"><path fill="#aecbfa" d="M8.9 2.63L12.02 12h9.36z"/><path fill="#4285f4" d="M21.38 12h-9.36L8.9 21.38zM3.44 21.38l3.13-1.57L8.9 12H5.78z"/><path fill="#aecbfa" d="M3.44 2.63L5.78 12H8.9L6.57 4.19z"/></g></svg></div><div>
+    <div class="fd-zone">Google Cloud</div><div class="fd-lname">The agent</div>
+    <div class="fd-lmeta">Cloud Run Job, woken every 4 hours by Cloud&nbsp;Scheduler. Holds no state between runs.</div></div></div>
+  <div class="fd-lane"><div><svg class="fd-ico" width="26" height="26" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="#4285F4" aria-hidden="true"><path d="M11.04 19.32Q12 21.51 12 24q0-2.49.93-4.68.96-2.19 2.58-3.81t3.81-2.55Q21.51 12 24 12q-2.49 0-4.68-.93a12.3 12.3 0 0 1-3.81-2.58 12.3 12.3 0 0 1-2.58-3.81Q12 2.49 12 0q0 2.49-.96 4.68-.93 2.19-2.55 3.81a12.3 12.3 0 0 1-3.81 2.58Q2.49 12 0 12q2.49 0 4.68.96 2.19.93 3.81 2.55t2.55 3.81"/></svg></div><div>
+    <div class="fd-zone">Vertex AI</div><div class="fd-lname">Gemini 3.7 Flash</div>
+    <div class="fd-lmeta">Reads the ticket, writes the SQL. Sees names and types — never rows.</div></div></div>
+  <div class="fd-lane"><div><svg class="fd-ico" width="26" height="26" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><g fill-rule="evenodd"><path fill="#aecbfa" d="M6.73 10.83v2.63a4.9 4.9 0 0 0 1.71 1.74v-4.37Z"/><path fill="#669df6" d="M9.89 8.41v7.53A8 8 0 0 0 11 16a8 8 0 0 0 1 0V8.41Z"/><path fill="#aecbfa" d="M13.64 11.86v3.29a5 5 0 0 0 1.7-1.82v-1.47Z"/><path fill="#4285f4" d="m17.74 16.32l-1.42 1.42a.42.42 0 0 0 0 .6l3.54 3.54a.42.42 0 0 0 .59 0l1.43-1.43a.42.42 0 0 0 0-.59l-3.54-3.54a.42.42 0 0 0-.6 0"/><path fill="#669df6" d="M11 2a9 9 0 1 0 9 9a9 9 0 0 0-9-9m0 15.69A6.68 6.68 0 1 1 17.69 11A6.68 6.68 0 0 1 11 17.69"/></g></svg></div><div>
+    <div class="fd-zone">BigQuery</div><div class="fd-lname">Your warehouse</div>
+    <div class="fd-lmeta"><span class="fd-mono">INFORMATION_SCHEMA</span> · your tables, read-only ·
+    <span class="fd-mono">agent_state</span> audit trail</div></div></div>
+
+  <div class="fd-steps"><div class="fd-row"><div class="fd-bar fd-k-read fd-rev" style="grid-column:1 / 3"><span class="fd-num">1</span><span class="fd-line"></span><span class="fd-lab">reads the ticket and its comments</span><span class="fd-head"></span></div></div><div class="fd-row"><div class="fd-bar fd-k-ai" style="grid-column:2 / 4"><span class="fd-num">2</span><span class="fd-line"></span><span class="fd-lab">sends the ticket text and column names</span><span class="fd-head"></span></div></div><div class="fd-row"><div class="fd-bar fd-k-read" style="grid-column:2 / 5"><span class="fd-num">3</span><span class="fd-line"></span><span class="fd-lab">reads table and column names only</span><span class="fd-head"></span></div></div><div class="fd-row"><div class="fd-bar fd-k-ai fd-rev" style="grid-column:2 / 4"><span class="fd-num">4</span><span class="fd-line"></span><span class="fd-lab">returns the SQL to run</span><span class="fd-head"></span></div></div><div class="fd-row"><div class="fd-bar fd-k-stop fd-rev" style="grid-column:1 / 3"><span class="fd-num">5</span><span class="fd-line"></span><span class="fd-lab">posts the query for approval, then exits</span><span class="fd-head"></span></div></div></div>
+  <div class="fd-gate"><b>Human approval gate</b>
+    <span>Steps 1–5 read no data — only names and types. The agent posts the query and exits.
+    Nothing below happens until a person replies on the ticket.</span></div>
+  <div class="fd-steps" style="border-top:0"><div class="fd-row"><div class="fd-bar fd-k-human fd-single" style="grid-column:1 / 2"><span class="fd-num">6</span><span class="fd-line"></span><span class="fd-lab">a reviewer replies @agent APPROVED</span><span class="fd-head"></span></div></div><div class="fd-row"><div class="fd-bar fd-k-exec" style="grid-column:2 / 5"><span class="fd-num">7</span><span class="fd-line"></span><span class="fd-lab">runs the approved query against your tables</span><span class="fd-head"></span></div></div><div class="fd-row"><div class="fd-bar fd-k-write fd-rev" style="grid-column:1 / 3"><span class="fd-num">8</span><span class="fd-line"></span><span class="fd-lab">posts the result back on the ticket</span><span class="fd-head"></span></div></div><div class="fd-row"><div class="fd-bar fd-k-write" style="grid-column:2 / 5"><span class="fd-num">9</span><span class="fd-line"></span><span class="fd-lab">writes an audit row to agent_state</span><span class="fd-head"></span></div></div></div>
+</div>
+
+<dl class="fd-foot">
+  <div class="fd-fact"><dt>Read-only, twice over</dt><dd>Only <span class="fd-mono">SELECT</span> is generated, and
+    the service account holds no write role — it cannot alter data even if asked.</dd></div>
+  <div class="fd-fact"><dt>Nothing unearned</dt><dd>A result that scanned zero bytes is rejected rather than
+    reported as a pass.</dd></div>
+  <div class="fd-fact"><dt>Every action is on the record</dt><dd>Each step is a Jira comment; each state change is
+    an append-only <span class="fd-mono">agent_state</span> row.</dd></div>
+  <div class="fd-fact"><dt>Bounded</dt><dd>Every external call times out at 60s; each ticket gets 180s before the
+    scan moves on.</dd></div>
+</dl>
+</div>
+  </section>
+
+  <section class="section">
+    <div class="section-label">In production</div>
+    <h2>The pipeline, stage by stage</h2>
+    <div class="flows">
+<div class="flow-box v2">
+        <div class="flow-title v2">Agent pipeline</div>
+        <div class="flow-steps">
+          <div class="flow-step"><div class="step-body">Jira Ticket<div class="step-sub">Plain English description</div></div></div>
+          <div class="flow-arrow">↓</div>
+          <div class="flow-step new"><div class="step-body">Intent Parser Agent (LLM)<div class="step-sub">NLP → table, change type, column</div></div></div>
+          <div class="flow-arrow">↓</div>
+          <div class="flow-step new"><div class="step-body">Partition Check<div class="step-sub">BQ metadata — zero bytes scanned</div></div></div>
+          <div class="flow-arrow">↓</div>
+          <div class="flow-step new"><div class="step-body">Query Generator Agent (LLM)<div class="step-sub">Generates partition-filtered SQL</div></div></div>
+          <div class="flow-arrow">↓</div>
+          <div class="flow-step kept"><div class="step-body">Safety Check<div class="step-sub">SELECT-only, no DML — inlined</div></div></div>
+          <div class="flow-arrow">↓</div>
+          <div class="flow-step new"><div class="step-body">Post Query to Jira<div class="step-sub">Human reviews + replies APPROVED</div></div></div>
+          <div class="flow-arrow">↓</div>
+          <div class="flow-step kept"><div class="step-body">BigQuery Executor<div class="step-sub">Runs approved query</div></div></div>
+          <div class="flow-arrow">↓</div>
+          <div class="flow-step new"><div class="step-body">Post Results to Jira<div class="step-sub">Pass/fail + errors in ticket</div></div></div>
+          <div class="flow-arrow">↓</div>
+          <div class="flow-step kept"><div class="step-body">Traceability Dashboard<div class="step-sub">Updated with new states</div></div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-label">State Machine</div>
+    <h2>Ticket Lifecycle</h2>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:16px;">The Jira ticket itself is the source of truth. Re-run the agent at any time — it picks up exactly where it left off. No separate database needed.</p>
+    <div class="states">
+      <div class="state-box s-pending">NOT_GENERATED<div class="state-sub">Agent generates query</div></div>
+      <div class="state-arrow">→</div>
+      <div class="state-box s-waiting">AWAITING APPROVAL<div class="state-sub">Human reviews in Jira</div></div>
+      <div class="state-arrow">→</div>
+      <div class="state-box s-approved">APPROVED<div class="state-sub">Agent executes in BQ</div></div>
+      <div class="state-arrow">→</div>
+      <div class="state-box s-passed">EXECUTED<div class="state-sub">Results in Jira + dashboard</div></div>
+    </div>
+  </section>
+
+  <!-- Key Features -->
+  
+
+  <section class="section">
+    <div class="section-label">Key Features</div>
+    <h2>What Makes It Smart</h2>
+    <div class="features">
+
+      <div class="feature-card fc-blue">
+        <div class="f-icon">🧠</div>
+        <h4>NLP Intent Parsing</h4>
+        <p>Understands both structured keywords and plain English. Engineers write naturally — the agent figures out what changed.</p>
+        <div class="f-detail">"we added a column session_id to 
+          the events table"
+→ change_type: column_added
+→ column: session_id</div>
+      </div>
+
+      <div class="feature-card fc-green">
+        <div class="f-icon">🔍</div>
+        <h4>Partition-Aware Queries</h4>
+        <p>Before generating SQL, the agent checks BigQuery table metadata (zero bytes scanned) to detect partition columns.</p>
+        <div class="f-detail">sale_date (DAY) detected
+→ WHERE sale_date >= DATE_SUB(
+  CURRENT_DATE(), INTERVAL 7 DAY)
+
+No partition found
+→ Warning shown before approval</div>
+      </div>
+
+      <div class="feature-card fc-orange">
+        <div class="f-icon">✏️</div>
+        <h4>Human Query Override</h4>
+        <p>If the generated query needs changes, the reviewer pastes corrected SQL in a Jira comment — the agent uses that on the next run.</p>
+        <div class="f-detail">1. Agent posts generated query
+2. Reviewer pastes {code:sql} fix
+3. Reviewer replies: APPROVED
+4. Agent uses corrected query</div>
+      </div>
+
+      <div class="feature-card fc-purple">
+        <div class="f-icon">📋</div>
+        <h4>Jira-Native Results</h4>
+        <p>Pass, fail, and errors are posted directly back to the Jira ticket — full audit trail without opening any other tool.</p>
+        <div class="f-detail">(/) VALIDATION PASSED
+Details: sale_date total=12842...
+Bytes scanned: 164.00 bytes
+
+(x) EXECUTION_FAILED
+Error: Reauthentication needed</div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Metadata Storage -->
+  <footer style="margin-top:20px;text-align:center;color:var(--muted);font-size:12px;">
+    TraceGuard Data Validation Agent
+  </footer>
+
+</main>
+</body>
+</html>

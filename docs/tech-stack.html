@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Validation agent — architecture and technology</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f4f6f9; --panel:#fff; --box:#dde1e7; --ink:#1a2130; --muted:#63707f;
+  --gcp:#4285f4; --jira:#2684ff; --safe:#137333; --warn:#c25e00; --danger:#a50e0e;
+  --shadow:0 1px 2px rgba(20,32,50,.05),0 4px 14px rgba(20,32,50,.05);
+}
+*{box-sizing:border-box}
+body{
+  margin:0;padding:clamp(18px,3vw,40px);background:var(--bg);color:var(--ink);
+  font-family:"IBM Plex Sans",system-ui,sans-serif;font-size:14px;line-height:1.5;
+}
+.wrap{max-width:1560px;margin:0 auto}
+h1{font-size:clamp(21px,2.5vw,28px);font-weight:700;margin:0 0 5px;letter-spacing:-.015em}
+.sub{color:var(--muted);margin:0 0 24px;font-size:13.5px;max-width:96ch}
+.sub code{font-family:"IBM Plex Mono",monospace;font-size:12.5px;background:var(--panel);border:1px solid var(--box);padding:1px 5px;border-radius:3px}
+
+/* ── people, outside the platform ───────────────────────── */
+.people{
+  background:var(--panel);border:1px solid var(--box);border-radius:8px;
+  box-shadow:var(--shadow);padding:13px 18px;margin-bottom:0;
+  display:flex;align-items:center;gap:18px;flex-wrap:wrap;
+}
+.people .lbl{font-weight:700;font-size:14px;display:flex;align-items:center;gap:9px}
+.people .lbl svg{width:20px;height:20px}
+.people .items{display:flex;gap:9px;flex-wrap:wrap}
+.stem{display:flex;flex-direction:column;align-items:center;color:#8b96a5}
+.stem i{width:1px;height:20px;background:currentColor;display:block}
+.stem::after{content:"";width:0;height:0;border-top:6px solid currentColor;border-left:4px solid transparent;border-right:4px solid transparent}
+.stem.up::after{border-top:0;border-bottom:6px solid currentColor}
+.stem-row{display:flex;justify-content:center;gap:70px}
+
+/* ── the platform boundary ──────────────────────────────── */
+.platform{
+  border:1.5px solid var(--gcp);border-radius:10px;background:rgba(66,133,244,.04);
+  padding:16px;position:relative;
+}
+.platform-tag{
+  display:flex;align-items:center;gap:9px;margin-bottom:14px;
+}
+.platform-tag svg{width:24px;height:24px}
+.platform-tag b{font-size:15.5px;letter-spacing:-.01em}
+.platform-tag em{
+  font-family:"IBM Plex Mono",monospace;font-style:normal;font-size:10.5px;
+  color:var(--muted);letter-spacing:.02em;
+}
+
+.frame{display:grid;grid-template-columns:210px 1fr 210px;gap:14px;align-items:stretch}
+
+/* ── rails and layers share the card look ───────────────── */
+.rail,.layer{
+  background:var(--panel);border:1px solid var(--box);border-radius:8px;
+  box-shadow:var(--shadow);padding:13px;
+}
+.rail{display:flex;flex-direction:column;gap:13px}
+.center{display:flex;flex-direction:column;gap:12px}
+.stitle{
+  text-align:center;font-weight:700;font-size:13.5px;margin:0 0 10px;
+  letter-spacing:.01em;
+}
+.stitle.gov{color:var(--safe)} .stitle.ops{color:var(--gcp)}
+.stitle.ing{color:var(--muted)} .stitle.reason{color:var(--gcp)}
+.stitle.exec{color:var(--warn)} .stitle.out{color:var(--jira)}
+.sgroup+.sgroup{border-top:1px dashed var(--box);padding-top:12px}
+
+/* ── the logo tile, the unit everything is built from ───── */
+.tiles{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.tiles.col{flex-direction:column;flex-wrap:nowrap}
+.tile{
+  background:var(--panel);border:1px solid var(--box);border-radius:6px;
+  padding:9px 10px;display:flex;align-items:center;gap:9px;min-width:0;
+  transition:transform .14s ease,box-shadow .14s ease,border-color .14s ease;
+}
+.tile:hover{transform:translateY(-1px);box-shadow:var(--shadow);border-color:#c4cad3}
+.tile .ico{width:20px;height:20px;flex:none;display:grid;place-items:center}
+.tile .ico svg{width:20px;height:20px}
+.mono-ico{
+  width:20px;height:20px;border-radius:4px;display:grid;place-items:center;
+  font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:600;color:#fff;
+}
+.tile .tx{min-width:0}
+.tile .t1{display:block;font-weight:600;font-size:12.5px;line-height:1.3}
+.tile .t2{display:block;font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--muted);line-height:1.35;margin-top:1px}
+/* vertical flow between the stacked layers, bottom to top */
+.up-link{display:grid;place-items:center;color:#98a2ae;margin:-4px 0}
+.up-link svg{width:16px;height:16px}
+
+/* ── the cost ladder: the one place with real emphasis ──── */
+.ladder{display:grid;grid-template-columns:1fr auto 1fr auto 1fr;align-items:stretch;gap:0}
+.rung{
+  border:1.5px solid;border-radius:7px;padding:11px 12px;text-align:center;background:var(--panel);
+}
+.rung.r1{border-color:#b6bcc5}
+.rung.r2{border-color:var(--gcp);background:rgba(66,133,244,.05)}
+.rung.r3{border-color:var(--warn);background:rgba(194,94,0,.06)}
+.rung .rname{font-weight:700;font-size:13px;margin-bottom:3px}
+.rung .rcost{
+  font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.05em;
+  text-transform:uppercase;margin-bottom:5px;
+}
+.rung.r1 .rcost,.rung.r2 .rcost{color:var(--safe)} .rung.r3 .rcost{color:var(--warn)}
+.rung .rnote{font-size:11.5px;color:var(--muted);line-height:1.4}
+.chev{display:grid;place-items:center;padding:0 9px;color:#98a2ae}
+.chev.gate{color:var(--warn)}
+.chev svg{width:15px;height:15px}
+.gatechip{
+  font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:600;color:var(--warn);
+  writing-mode:vertical-rl;letter-spacing:.09em;margin-top:4px;
+}
+
+/* horizontal connectors between rails and centre */
+.link{display:grid;place-items:center;color:#98a2ae}
+
+.foot{
+  margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:14px;
+}
+.note{
+  background:var(--panel);border:1px solid var(--box);border-radius:8px;
+  box-shadow:var(--shadow);padding:13px 15px;font-size:12.5px;color:var(--muted);
+}
+.note b{color:var(--ink);font-size:13px;display:block;margin-bottom:5px}
+.note .badge{
+  font-family:"IBM Plex Mono",monospace;font-size:9px;letter-spacing:.09em;text-transform:uppercase;
+  border:1px solid var(--warn);color:var(--warn);border-radius:3px;padding:1px 5px;margin-left:6px;
+}
+.note .badge.live{border-color:var(--safe);color:var(--safe)}
+
+@media (max-width:1180px){
+  .frame{grid-template-columns:1fr}
+  .ladder{grid-template-columns:1fr}
+  .chev{padding:7px 0;transform:rotate(90deg)}
+  .gatechip{writing-mode:horizontal-tb;margin:0 0 0 6px}
+  .foot{grid-template-columns:1fr}
+  .tiles.col{flex-direction:row;flex-wrap:wrap}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>TraceGuard validation agent — architecture and technology</h1>
+
+<!-- people sit outside the platform, like the users of any system -->
+<div class="people">
+  <span class="lbl">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7.5" r="3.6" fill="none" stroke="#2684ff" stroke-width="1.8"/><path d="M4.6 20c0-4.1 3.3-6.6 7.4-6.6s7.4 2.5 7.4 6.6" fill="none" stroke="#2684ff" stroke-width="1.8" stroke-linecap="round"/></svg>
+    Data engineers &amp; reviewers
+  </span>
+  <div class="items">
+    <div class="tile"><span class="ico"><svg viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs><linearGradient id="jA" x1="98.031%" x2="58.888%" y1=".161%" y2="40.766%"><stop offset="18%" stop-color="#0052cc"/><stop offset="100%" stop-color="#2684ff"/></linearGradient><linearGradient id="jB" x1="100.665%" x2="55.402%" y1=".455%" y2="44.727%"><stop offset="18%" stop-color="#0052cc"/><stop offset="100%" stop-color="#2684ff"/></linearGradient></defs><path fill="#2684ff" d="M244.658 0H121.707a55.5 55.5 0 0 0 55.502 55.502h22.649V77.37c.02 30.625 24.841 55.447 55.466 55.467V10.666C255.324 4.777 250.55 0 244.658 0"/><path fill="url(#jA)" d="M183.822 61.262H60.872c.019 30.625 24.84 55.447 55.466 55.467h22.649v21.938c.039 30.625 24.877 55.43 55.502 55.43V71.93c0-5.891-4.776-10.667-10.667-10.667"/><path fill="url(#jB)" d="M122.951 122.489H0c0 30.653 24.85 55.502 55.502 55.502h22.72v21.867c.02 30.597 24.798 55.408 55.396 55.466V133.156c0-5.891-4.776-10.667-10.667-10.667"/></svg></span><span class="tx"><span class="t1">Atlassian Jira</span><span class="t2">tickets · approvals</span></span></div>
+    <div class="tile"><span class="ico"><span class="mono-ico" style="background:#2684ff">JQL</span></span><span class="tx"><span class="t1">Board filter</span><span class="t2">label: validation-agent</span></span></div>
+    <div class="tile"><span class="ico"><span class="mono-ico" style="background:#137333">@</span></span><span class="tx"><span class="t1">Approval</span><span class="t2">@agent APPROVED</span></span></div>
+    <div class="tile"><span class="ico"><span class="mono-ico" style="background:#63707f">xls</span></span><span class="tx"><span class="t1">Data models</span><span class="t2">CSV / XLSX attachments</span></span></div>
+  </div>
+</div>
+
+<div class="stem-row"><span class="stem"><i></i></span><span class="stem up"><i></i></span></div>
+
+<!-- ── the platform ─────────────────────────────────────── -->
+<div class="platform">
+  <div class="platform-tag">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><g fill-rule="evenodd"><path fill="#aecbfa" d="M8.9 2.63L12.02 12h9.36z"/><path fill="#4285f4" d="M21.38 12h-9.36L8.9 21.38zM3.44 21.38l3.13-1.57L8.9 12H5.78z"/><path fill="#aecbfa" d="M3.44 2.63L5.78 12H8.9L6.57 4.19z"/></g></svg>
+    <b>Google Cloud</b>
+  </div>
+
+  <div class="frame">
+
+    <!-- ── left rail: the guardrails ──────────────────────── -->
+    <div class="rail">
+      <div class="sgroup">
+        <p class="stitle gov">Guardrails</p>
+        <div class="tiles col">
+          <div class="tile"><span class="ico"><span class="mono-ico" style="background:#137333">SQL</span></span><span class="tx"><span class="t1">SELECT-only check</span><span class="t2">main.py · bigquery_executor.py</span></span></div>
+          <div class="tile"><span class="ico"><span class="mono-ico" style="background:#c25e00">II</span></span><span class="tx"><span class="t1">Human approval gate</span><span class="t2">@agent APPROVED</span></span></div>
+          <div class="tile"><span class="ico"><span class="mono-ico" style="background:#137333">GiB</span></span><span class="tx"><span class="t1">Byte cap</span><span class="t2">10 GiB per query</span></span></div>
+          <div class="tile"><span class="ico"><span class="mono-ico" style="background:#137333">⏱</span></span><span class="tx"><span class="t1">Timeouts</span><span class="t2">per call and per ticket</span></span></div>
+          <div class="tile"><span class="ico"><span class="mono-ico" style="background:#137333">Δ</span></span><span class="tx"><span class="t1">Schema drift check</span><span class="t2">snapshot compared per run</span></span></div>
+          <div class="tile"><span class="ico"><span class="mono-ico" style="background:#a50e0e">!</span></span><span class="tx"><span class="t1">Unearned-pass reject</span><span class="t2">main.py</span></span></div>
+          <div class="tile"><span class="ico"><span class="mono-ico" style="background:#a50e0e">&lt;/&gt;</span></span><span class="tx"><span class="t1">Injection handling</span><span class="t2">intent_parser.py</span></span></div>
+        </div>
+      </div>
+      <div class="sgroup">
+        <p class="stitle gov">Security</p>
+        <div class="tiles col">
+          <div class="tile"><span class="ico"><span class="mono-ico" style="background:#4285f4">IAM</span></span><span class="tx"><span class="t1">IAM + service account</span><span class="t2">read-only BigQuery role</span></span></div>
+          <div class="tile"><span class="ico"><span class="mono-ico" style="background:#4285f4">ADC</span></span><span class="tx"><span class="t1">ADC tokens</span><span class="t2">refreshed per call</span></span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── centre: the pipeline, bottom to top ────────────── -->
+    <div class="center">
+
+      <div class="up-link" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 20V5m0 0l-6 6m6-6l6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="layer">
+        <p class="stitle out">Output</p>
+        <div class="tiles">
+          <div class="tile"><span class="ico"><svg viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path fill="#2684ff" d="M244.658 0H121.707a55.5 55.5 0 0 0 55.502 55.502h22.649V77.37c.02 30.625 24.841 55.447 55.466 55.467V10.666C255.324 4.777 250.55 0 244.658 0"/><path fill="#2684ff" opacity=".72" d="M183.822 61.262H60.872c.019 30.625 24.84 55.447 55.466 55.467h22.649v21.938c.039 30.625 24.877 55.43 55.502 55.43V71.93c0-5.891-4.776-10.667-10.667-10.667"/><path fill="#2684ff" opacity=".48" d="M122.951 122.489H0c0 30.653 24.85 55.502 55.502 55.502h22.72v21.867c.02 30.597 24.798 55.408 55.396 55.466V133.156c0-5.891-4.776-10.667-10.667-10.667"/></svg></span><span class="tx"><span class="t1">Jira comment</span><span class="t2">verdict + evidence + bytes</span></span></div>
+          <div class="tile"><span class="ico"><span class="mono-ico" style="background:#63707f">{ }</span></span><span class="tx"><span class="t1">traceability-report.json</span><span class="t2">one entry per ticket</span></span></div>
+          <div class="tile"><span class="ico"><span class="mono-ico" style="background:#63707f">&lt;h&gt;</span></span><span class="tx"><span class="t1">Dashboard HTML</span><span class="t2">generated per scan</span></span></div>
+          <div class="tile"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#3776ab" d="M11.9 0C6.1 0 6.5 2.5 6.5 2.5v2.6h5.5v.8H4.3S.6 5.5.6 11.4c0 5.9 3.2 5.7 3.2 5.7h1.9v-2.7s-.1-3.2 3.1-3.2h5.5s3.1.05 3.1-3V3.1S17.9 0 11.9 0M8.8 1.7a1 1 0 1 1 0 2a1 1 0 0 1 0-2"/><path fill="#ffd43b" d="M12.1 24c5.8 0 5.4-2.5 5.4-2.5v-2.6H12v-.8h7.7s3.7.4 3.7-5.5c0-5.9-3.2-5.7-3.2-5.7h-1.9v2.7s.1 3.2-3.1 3.2H9.7s-3.1-.05-3.1 3v5.1S6.1 24 12.1 24m3.1-1.7a1 1 0 1 1 0-2a1 1 0 0 1 0 2"/></svg></span><span class="tx"><span class="t1">http.server</span><span class="t2">stdlib · port 8765 · SSE</span></span></div>
+        </div>
+      </div>
+
+      <div class="up-link" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 20V5m0 0l-6 6m6-6l6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="layer">
+        <p class="stitle exec">BigQuery</p>
+        <div class="ladder">
+          <div class="rung r1">
+            <p class="rname">INFORMATION_SCHEMA</p>
+            <p class="rcost">0 bytes</p>
+            <p class="rnote">Columns, types, partition freshness</p>
+          </div>
+          <div class="chev"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4l9 8-9 8" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="rung r2">
+            <p class="rname">Dry run</p>
+            <p class="rcost">0 bytes</p>
+            <p class="rnote">Validates syntax and cost before posting</p>
+          </div>
+          <div class="chev gate">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4l9 8-9 8" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span class="gatechip">APPROVAL</span>
+          </div>
+          <div class="rung r3">
+            <p class="rname">Execution</p>
+            <p class="rcost">real bytes · ≤10 GiB</p>
+            <p class="rnote">The approved SELECT, after approval</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="up-link" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 20V5m0 0l-6 6m6-6l6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="layer">
+        <p class="stitle reason">Reasoning — Vertex AI</p>
+        <div class="tiles">
+          <div class="tile"><span class="ico"><svg viewBox="0 0 24 24" fill="#4285F4" aria-hidden="true"><path d="M11.04 19.32Q12 21.51 12 24q0-2.49.93-4.68.96-2.19 2.58-3.81t3.81-2.55Q21.51 12 24 12q-2.49 0-4.68-.93a12.3 12.3 0 0 1-3.81-2.58 12.3 12.3 0 0 1-2.58-3.81Q12 2.49 12 0q0 2.49-.96 4.68-.93 2.19-2.55 3.81a12.3 12.3 0 0 1-3.81 2.58Q2.49 12 0 12q2.49 0 4.68.96 2.19.93 3.81 2.55t2.55 3.81"/></svg></span><span class="tx"><span class="t1">Gemini 3.7 Flash</span><span class="t2">region: global</span></span></div>
+          <div class="tile"><span class="ico"><span class="mono-ico" style="background:#1a2130">API</span></span><span class="tx"><span class="t1">OpenAI-compatible endpoint</span><span class="t2">openai SDK</span></span></div>
+          <div class="tile"><span class="ico"><span class="mono-ico" style="background:#4285f4">1</span></span><span class="tx"><span class="t1">intent_parser.py</span><span class="t2">ticket → structured request</span></span></div>
+          <div class="tile"><span class="ico"><span class="mono-ico" style="background:#4285f4">2</span></span><span class="tx"><span class="t1">query_generator.py</span><span class="t2">request + schema → SQL</span></span></div>
+        </div>
+      </div>
+
+      <div class="layer">
+        <p class="stitle ing">Ingestion</p>
+        <div class="tiles">
+          <div class="tile"><span class="ico"><span class="mono-ico" style="background:#2684ff">REST</span></span><span class="tx"><span class="t1">Jira REST API</span><span class="t2">search · read · comment</span></span></div>
+          <div class="tile"><span class="ico"><span class="mono-ico" style="background:#63707f">↧</span></span><span class="tx"><span class="t1">Attachment parser</span><span class="t2">openpyxl · csv</span></span></div>
+          <div class="tile"><span class="ico"><span class="mono-ico" style="background:#63707f">FSM</span></span><span class="tx"><span class="t1">State machine</span><span class="t2">derived from Jira comments</span></span></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ── right rail: runtime and ops ────────────────────── -->
+    <div class="rail">
+      <div class="sgroup">
+        <p class="stitle ops">Runtime</p>
+        <div class="tiles col">
+          <div class="tile"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#3776ab" d="M11.9 0C6.1 0 6.5 2.5 6.5 2.5v2.6h5.5v.8H4.3S.6 5.5.6 11.4c0 5.9 3.2 5.7 3.2 5.7h1.9v-2.7s-.1-3.2 3.1-3.2h5.5s3.1.05 3.1-3V3.1S17.9 0 11.9 0M8.8 1.7a1 1 0 1 1 0 2a1 1 0 0 1 0-2"/><path fill="#ffd43b" d="M12.1 24c5.8 0 5.4-2.5 5.4-2.5v-2.6H12v-.8h7.7s3.7.4 3.7-5.5c0-5.9-3.2-5.7-3.2-5.7h-1.9v2.7s.1 3.2-3.1 3.2H9.7s-3.1-.05-3.1 3v5.1S6.1 24 12.1 24m3.1-1.7a1 1 0 1 1 0-2a1 1 0 0 1 0 2"/></svg></span><span class="tx"><span class="t1">Python 3.11</span><span class="t2">stateless per run</span></span></div>
+          <div class="tile"><span class="ico"><span class="mono-ico" style="background:#4285f4">RUN</span></span><span class="tx"><span class="t1">Cloud Run Job</span><span class="t2">target, not live</span></span></div>
+          <div class="tile"><span class="ico"><span class="mono-ico" style="background:#4285f4">⏰</span></span><span class="tx"><span class="t1">Cloud Scheduler</span><span class="t2">target · every 4 hours</span></span></div>
+          <div class="tile"><span class="ico"><span class="mono-ico" style="background:#4285f4">AR</span></span><span class="tx"><span class="t1">Artifact Registry</span><span class="t2">target · container image</span></span></div>
+        </div>
+      </div>
+      <div class="sgroup">
+        <p class="stitle ops">Observability &amp; CI</p>
+        <div class="tiles col">
+          <div class="tile"><span class="ico"><span class="mono-ico" style="background:#4285f4">MON</span></span><span class="tx"><span class="t1">Cloud Monitoring</span><span class="t2">token spend per model</span></span></div>
+          <div class="tile"><span class="ico"><span class="mono-ico" style="background:#1a2130">GH</span></span><span class="tx"><span class="t1">GitHub Actions</span><span class="t2">compile · import · failure suite</span></span></div>
+          <div class="tile"><span class="ico"><span class="mono-ico" style="background:#137333">79</span></span><span class="tx"><span class="t1">Test cases</span><span class="t2">golden 42 · edge 28 · failure 9</span></span></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="foot">
+  <div class="note">
+    <b>Dependencies</b>
+    <code>openai</code> · <code>google-cloud-bigquery</code> · <code>google-auth</code> ·
+    <code>requests</code> · <code>python-dotenv</code> · <code>openpyxl</code>.
+    Everything else is the Python standard library.
+  </div>
+  <div class="note">
+    <b>Deployment status</b>
+    <span class="badge live">live</span> agent · Vertex AI · BigQuery · dashboard · CI<br>
+    <span class="badge">target</span> Cloud Run Job · Cloud Scheduler · Artifact Registry. Launched manually today.
+  </div>
+</div>
+
+</div>
+</body>
+</html>

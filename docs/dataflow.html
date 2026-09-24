@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Validation agent — data flow</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f7fa; --ink:#16202e; --muted:#6b7684; --line:#94a0ad; --gcp:#4285f4;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;padding:clamp(20px,4vw,52px);background:
+    radial-gradient(1100px 520px at 62% 12%, #ffffff 0%, rgba(255,255,255,0) 62%), var(--bg);
+  color:var(--ink);font-family:"IBM Plex Sans",system-ui,sans-serif;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;
+}
+.wrap{max-width:1180px;width:100%}
+h1{font-size:clamp(19px,2.2vw,25px);font-weight:700;margin:0 0 6px;letter-spacing:-.015em}
+.key{
+  display:flex;gap:18px;flex-wrap:wrap;margin:0 0 12px;
+  font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--muted);
+}
+.key i{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:6px;vertical-align:1px}
+svg.board{width:100%;height:auto;display:block;overflow:visible}
+
+/* nodes */
+.card{fill:#fff;stroke:#dbe1e8;stroke-width:1.2;filter:url(#soft)}
+.card-hit{fill:transparent;cursor:default}
+.node{transition:transform .2s cubic-bezier(.2,.7,.3,1);transform-box:fill-box;transform-origin:center}
+.node:hover{transform:translateY(-3px)}
+.n-name{font-size:16.5px;font-weight:700;fill:var(--ink);text-anchor:middle}
+.n-meta{font-family:"IBM Plex Mono",monospace;font-size:11.5px;fill:var(--muted);text-anchor:middle}
+.wire{stroke:var(--line);stroke-width:1.6;fill:none}
+.wire-lbl{font-family:"IBM Plex Mono",monospace;font-size:11px;fill:var(--muted)}
+.step circle{fill:#fff;stroke:var(--line);stroke-width:1.3}
+.step text{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;fill:var(--ink);text-anchor:middle}
+.cloud-box{fill:rgba(66,133,244,.05);stroke:var(--gcp);stroke-width:1.4}
+.cloud-name{font-size:13.5px;font-weight:700;fill:#1f4fa8}
+
+/* packets travelling the wires */
+.pkt{offset-rotate:0deg;animation:run 3.4s linear infinite}
+.pkt circle{r:4.4}
+@keyframes run{
+  0%{offset-distance:0%;opacity:0}
+  8%{opacity:1}
+  88%{opacity:1}
+  100%{offset-distance:100%;opacity:0}
+}
+.p1{offset-path:path("M 250 252 L 384 252");animation-delay:0s}
+.p2{offset-path:path("M 390 295 L 256 295");animation-delay:2.05s}
+.p3{offset-path:path("M 495 345 L 495 404");animation-delay:2.72s}
+.p4{offset-path:path("M 600 252 L 690 252 L 690 177 L 799 177");animation-delay:.68s}
+.p5{offset-path:path("M 600 295 L 690 295 L 690 362 L 799 362");animation-delay:1.36s}
+
+/* the agent is the only thing always working */
+.pulse{fill:none;stroke:#3776ab;stroke-width:1.4;opacity:0;animation:ping 3.4s ease-out infinite}
+@keyframes ping{
+  0%{opacity:.5;transform:scale(.99)}
+  55%{opacity:0;transform:scale(1.035)}
+  100%{opacity:0;transform:scale(1.035)}
+}
+.pulse{transform-box:fill-box;transform-origin:center}
+
+@media (prefers-reduced-motion:reduce){
+  .pkt,.pulse{animation:none;display:none}
+}
+</style>
+
+<style>
+/* ── presentation shell (the diagram above is untouched) ─────────── */
+body{
+  display:block;padding:clamp(18px,3.5vw,46px);
+  background:
+    radial-gradient(900px 460px at 78% -8%, #eaf1fd 0%, rgba(234,241,253,0) 60%),
+    radial-gradient(700px 420px at 8% 105%, #eef1f5 0%, rgba(238,241,245,0) 62%),
+    #eceff3;
+  min-height:100vh;
+}
+.wrap{max-width:none;width:auto}
+.sheet{
+  max-width:1280px;margin:0 auto;background:#fff;border:1px solid #dfe4ea;
+  border-radius:16px;overflow:hidden;
+  box-shadow:0 1px 2px rgba(16,26,40,.04),0 18px 44px -18px rgba(16,26,40,.22);
+}
+.sheet-head{
+  display:flex;align-items:flex-end;justify-content:space-between;gap:24px;flex-wrap:wrap;
+  padding:22px clamp(20px,3vw,32px) 18px;border-bottom:1px solid #e8ecf1;
+  background:linear-gradient(180deg,#fff 0%,#fafbfc 100%);
+}
+.kicker{
+  font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.16em;
+  text-transform:uppercase;color:#7b8794;margin:0 0 6px;
+}
+.sheet-head h1{margin:0;font-size:clamp(19px,2.1vw,24px)}
+.sheet-head .key{margin:0 0 2px}
+.canvas{
+  padding:clamp(16px,2.6vw,30px) clamp(14px,2.4vw,28px);
+  background:
+    linear-gradient(180deg,#fcfdfe 0%,#f8fafc 100%);
+}
+.sheet-foot{
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  padding:12px clamp(20px,3vw,32px);border-top:1px solid #e8ecf1;background:#fbfcfd;
+}
+.sheet-foot span{
+  font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:#6b7684;
+  border:1px solid #e2e7ed;border-radius:20px;padding:3px 11px;background:#fff;
+}
+.sheet-foot .spacer{flex:1;border:0;background:none;padding:0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="sheet">
+
+    <header class="sheet-head">
+      <div>
+        <p class="kicker">TraceGuard</p>
+        <h1>Validation agent — data flow</h1>
+      </div>
+      <p class="key">
+        <span><i style="background:#2684ff"></i>Jira</span>
+        <span><i style="background:#3776ab"></i>agent</span>
+        <span><i style="background:#4285f4"></i>Google Cloud</span>
+      </p>
+    </header>
+
+    <div class="canvas">
+<svg class="board" viewBox="0 0 1160 600" role="img"
+     aria-label="Jira exchanges tickets and results with the validation agent. The agent calls Vertex AI and BigQuery on Google Cloud, and writes the dashboard.">
+  <defs>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="3" stdDeviation="6" flood-color="#16202e" flood-opacity=".07"/>
+    </filter>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 1 L9 5 L0 9 z" fill="#94a0ad"/>
+    </marker>
+  </defs>
+
+  <!-- ── wires (drawn first, so cards sit on top) ─────────── -->
+  <path class="wire" d="M 250 252 L 384 252" marker-end="url(#ar)"/>
+  <path class="wire" d="M 390 295 L 256 295" marker-end="url(#ar)"/>
+  <path class="wire" d="M 495 345 L 495 404" marker-end="url(#ar)"/>
+  <path class="wire" d="M 600 252 L 690 252 L 690 177 L 799 177" marker-end="url(#ar)" marker-start="url(#ar)"/>
+  <path class="wire" d="M 600 295 L 690 295 L 690 362 L 799 362" marker-end="url(#ar)" marker-start="url(#ar)"/>
+
+  <text class="wire-lbl" x="317" y="231" text-anchor="middle">ticket</text>
+  <text class="wire-lbl" x="323" y="330" text-anchor="middle">query · result</text>
+
+  <g class="step"><circle cx="317" cy="252" r="11"/><text x="317" y="256">1</text></g>
+  <g class="step"><circle cx="690" cy="215" r="11"/><text x="690" y="219">2</text></g>
+  <g class="step"><circle cx="690" cy="330" r="11"/><text x="690" y="334">3</text></g>
+  <g class="step"><circle cx="323" cy="295" r="11"/><text x="323" y="299">4</text></g>
+  <g class="step"><circle cx="495" cy="376" r="11"/><text x="495" y="380">5</text></g>
+
+  <!-- packets -->
+  <g class="pkt p1"><circle fill="#2684ff"/></g>
+  <g class="pkt p2"><circle fill="#2684ff"/></g>
+  <g class="pkt p3"><circle fill="#6b7684"/></g>
+  <g class="pkt p4"><circle fill="#4285f4"/></g>
+  <g class="pkt p5"><circle fill="#4285f4"/></g>
+
+  <!-- ── google cloud boundary ────────────────────────────── -->
+  <rect class="cloud-box" x="780" y="60" width="320" height="420" rx="14"/>
+  <svg x="802" y="78" width="19" height="19" viewBox="0 0 24 24"><g fill-rule="evenodd"><path fill="#aecbfa" d="M8.9 2.63L12.02 12h9.36z"/><path fill="#4285f4" d="M21.38 12h-9.36L8.9 21.38zM3.44 21.38l3.13-1.57L8.9 12H5.78z"/><path fill="#aecbfa" d="M3.44 2.63L5.78 12H8.9L6.57 4.19z"/></g></svg>
+  <text class="cloud-name" x="830" y="93">Google Cloud</text>
+
+  <!-- ── Jira ─────────────────────────────────────────────── -->
+  <g class="node">
+    <rect class="card" x="40" y="200" width="210" height="145" rx="12"/>
+    <svg x="122" y="226" width="46" height="46" viewBox="0 0 256 256"><defs><linearGradient id="jA" x1="98.031%" x2="58.888%" y1=".161%" y2="40.766%"><stop offset="18%" stop-color="#0052cc"/><stop offset="100%" stop-color="#2684ff"/></linearGradient><linearGradient id="jB" x1="100.665%" x2="55.402%" y1=".455%" y2="44.727%"><stop offset="18%" stop-color="#0052cc"/><stop offset="100%" stop-color="#2684ff"/></linearGradient></defs><path fill="#2684ff" d="M244.658 0H121.707a55.5 55.5 0 0 0 55.502 55.502h22.649V77.37c.02 30.625 24.841 55.447 55.466 55.467V10.666C255.324 4.777 250.55 0 244.658 0"/><path fill="url(#jA)" d="M183.822 61.262H60.872c.019 30.625 24.84 55.447 55.466 55.467h22.649v21.938c.039 30.625 24.877 55.43 55.502 55.43V71.93c0-5.891-4.776-10.667-10.667-10.667"/><path fill="url(#jB)" d="M122.951 122.489H0c0 30.653 24.85 55.502 55.502 55.502h22.72v21.867c.02 30.597 24.798 55.408 55.396 55.466V133.156c0-5.891-4.776-10.667-10.667-10.667"/></svg>
+    <text class="n-name" x="145" y="300">Jira</text>
+    <text class="n-meta" x="145" y="321">tickets · approvals</text>
+  </g>
+
+  <!-- ── the agent ────────────────────────────────────────── -->
+  <g class="node">
+    <rect class="pulse" x="390" y="200" width="210" height="145" rx="12"/>
+    <rect class="card" x="390" y="200" width="210" height="145" rx="12"/>
+    <svg x="472" y="226" width="46" height="46" viewBox="0 0 24 24"><path fill="#3776ab" d="M11.9 0C6.1 0 6.5 2.5 6.5 2.5v2.6h5.5v.8H4.3S.6 5.5.6 11.4c0 5.9 3.2 5.7 3.2 5.7h1.9v-2.7s-.1-3.2 3.1-3.2h5.5s3.1.05 3.1-3V3.1S17.9 0 11.9 0M8.8 1.7a1 1 0 1 1 0 2a1 1 0 0 1 0-2"/><path fill="#ffd43b" d="M12.1 24c5.8 0 5.4-2.5 5.4-2.5v-2.6H12v-.8h7.7s3.7.4 3.7-5.5c0-5.9-3.2-5.7-3.2-5.7h-1.9v2.7s.1 3.2-3.1 3.2H9.7s-3.1-.05-3.1 3v5.1S6.1 24 12.1 24m3.1-1.7a1 1 0 1 1 0-2a1 1 0 0 1 0 2"/></svg>
+    <text class="n-name" x="495" y="300">Validation agent</text>
+    <text class="n-meta" x="495" y="321">Python 3.11</text>
+  </g>
+
+  <!-- ── dashboard ────────────────────────────────────────── -->
+  <g class="node">
+    <rect class="card" x="390" y="410" width="210" height="140" rx="12"/>
+    <svg x="474" y="434" width="42" height="42" viewBox="0 0 24 24"><rect x="2.5" y="4" width="19" height="14" rx="2" fill="none" stroke="#5f6b7a" stroke-width="1.7"/><path d="M6 14.5V11m3.3 3.5V8.5M12.7 14.5v-2.2M16 14.5V9.8" stroke="#4285f4" stroke-width="2" stroke-linecap="round"/><path d="M9 21h6" stroke="#5f6b7a" stroke-width="1.7" stroke-linecap="round"/></svg>
+    <text class="n-name" x="495" y="505">Dashboard</text>
+    <text class="n-meta" x="495" y="526">HTML · port 8765</text>
+  </g>
+
+  <!-- ── vertex ai ────────────────────────────────────────── -->
+  <g class="node">
+    <rect class="card" x="805" y="105" width="270" height="145" rx="12"/>
+    <svg x="917" y="130" width="46" height="46" viewBox="0 0 24 24" fill="#4285F4"><path d="M11.04 19.32Q12 21.51 12 24q0-2.49.93-4.68.96-2.19 2.58-3.81t3.81-2.55Q21.51 12 24 12q-2.49 0-4.68-.93a12.3 12.3 0 0 1-3.81-2.58 12.3 12.3 0 0 1-2.58-3.81Q12 2.49 12 0q0 2.49-.96 4.68-.93 2.19-2.55 3.81a12.3 12.3 0 0 1-3.81 2.58Q2.49 12 0 12q2.49 0 4.68.96 2.19.93 3.81 2.55t2.55 3.81"/></svg>
+    <text class="n-name" x="940" y="205">Vertex AI</text>
+    <text class="n-meta" x="940" y="226">Gemini 3.7 Flash</text>
+  </g>
+
+  <!-- ── bigquery ─────────────────────────────────────────── -->
+  <g class="node">
+    <rect class="card" x="805" y="290" width="270" height="145" rx="12"/>
+    <svg x="917" y="315" width="46" height="46" viewBox="0 0 24 24"><g fill-rule="evenodd"><path fill="#aecbfa" d="M6.73 10.83v2.63a4.9 4.9 0 0 0 1.71 1.74v-4.37Z"/><path fill="#669df6" d="M9.89 8.41v7.53A8 8 0 0 0 11 16a8 8 0 0 0 1 0V8.41Z"/><path fill="#aecbfa" d="M13.64 11.86v3.29a5 5 0 0 0 1.7-1.82v-1.47Z"/><path fill="#4285f4" d="m17.74 16.32l-1.42 1.42a.42.42 0 0 0 0 .6l3.54 3.54a.42.42 0 0 0 .59 0l1.43-1.43a.42.42 0 0 0 0-.59l-3.54-3.54a.42.42 0 0 0-.6 0"/><path fill="#669df6" d="M11 2a9 9 0 1 0 9 9a9 9 0 0 0-9-9m0 15.69A6.68 6.68 0 1 1 17.69 11A6.68 6.68 0 0 1 11 17.69"/></g></svg>
+    <text class="n-name" x="940" y="390">BigQuery</text>
+    <text class="n-meta" x="940" y="411">schema · SELECT</text>
+  </g>
+
+</svg>
+    </div>
+
+    <footer class="sheet-foot">
+      <span>5 steps</span>
+      <span>read-only</span>
+      <span>human approval before execution</span>
+      <span class="spacer"></span>
+      <span>2026-08-21</span>
+    </footer>
+
+  </div>
+</div>
+</body>
+</html>
