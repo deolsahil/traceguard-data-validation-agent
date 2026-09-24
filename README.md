@@ -39,8 +39,8 @@ which is why approval can take days without anything breaking.
 Create a virtual environment so the project dependencies stay isolated from your system Python:
 
 ```bash
-git clone <your-github-url>
-cd e2e-data-validation-agent
+git clone https://github.com/deolsahil/traceguard-data-validation-agent.git
+cd traceguard-data-validation-agent
 python3 -m venv .venv
 source .venv/bin/activate       # Windows PowerShell: .venv\\Scripts\\Activate.ps1
 python -m pip install --upgrade pip
