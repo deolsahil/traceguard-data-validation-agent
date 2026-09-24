@@ -226,14 +226,6 @@ The gaps in `tests/golden_seed.sql` **are** the test data. Do not tidy them up:
 
 ---
 
-## CI
-
-[`.github/workflows/ci.yml`](../.github/workflows/ci.yml) runs on every push: compile,
-imports, the failure suite, and a direct check of the harness's approval regex. The edge
-and golden suites need real credentials, so they remain a manual gate before handover.
-
-Requires GitHub Actions to be enabled on the repository.
-
 ## What the suites do not cover
 
 Honest gaps, so nobody reads 79 passing cases as more than it is:
