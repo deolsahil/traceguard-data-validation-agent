@@ -4,9 +4,9 @@ An AI-powered agent that reads Jira tickets, generates BigQuery validation queri
 
 ## Launch video
 
-![](https://github.com/user-attachments/assets/b3f76273-bea9-457f-8934-d749d6bc6a24)
+[![Watch the TraceGuard launch video](media/traceguard-launch-poster.jpg)](https://github.com/user-attachments/assets/b3f76273-bea9-457f-8934-d749d6bc6a24)
 
-[Open the MP4 directly](https://github.com/user-attachments/assets/b3f76273-bea9-457f-8934-d749d6bc6a24) if your GitHub client does not render inline media. It shows the request-to-evidence workflow, the approval gate, the working agent, and the efficiency gains from automating repetitive validation work.
+Click the poster to play the MP4. It shows the request-to-evidence workflow, the approval gate, the working agent, and the efficiency gains from automating repetitive validation work. You can also [open the MP4 directly](https://github.com/user-attachments/assets/b3f76273-bea9-457f-8934-d749d6bc6a24).
 
 ## How it works
 
@@ -212,13 +212,6 @@ with no credentials present, the real-client case is live rather than skipped.
 
 This suite found the batch-isolation bug: `run_bulk` caught only `TicketTimeout`, so
 any other error on one ticket ended the whole scan.
-
-### CI
-
-`.github/workflows/ci.yml` runs everything checkable without credentials on every
-push: compile, imports, the failure suite, and a direct check of the approval-detection
-regex in the harness. The edge and golden suites call the real LLM and BigQuery, so
-they stay a manual gate before handover.
 
 ### Golden evaluation suite
 
