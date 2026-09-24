@@ -2,6 +2,12 @@
 
 An AI-powered agent that reads Jira tickets, generates BigQuery validation queries using an LLM, routes them through a human approval gate, executes them in BigQuery, and keeps a shared HTML traceability dashboard up to date.
 
+## Launch video
+
+[![Watch the TraceGuard launch video](media/traceguard-launch-poster.jpg)](media/traceguard-launch.mp4)
+
+[Watch the full launch video](media/traceguard-launch.mp4) — it shows the request-to-evidence workflow, the approval gate, the working agent, and the efficiency gains from automating repetitive validation work.
+
 ## How it works
 
 <img src="docs/architecture-diagram.svg" alt="The agent runs twice: once to propose a query, then a human approves it, then it executes." width="100%">
@@ -21,11 +27,59 @@ which is why approval can take days without anything breaking.
 
 ## Setup
 
+### Requirements
+
+- Python 3.11 or newer
+- A Jira Cloud or Jira Data Center account that can read tickets and add comments
+- A Google Cloud project with permission to read BigQuery metadata and submit dry-run or read-only jobs
+- Either Vertex AI through Application Default Credentials or an OpenAI-compatible LLM endpoint
+
+### Install locally
+
+Create a virtual environment so the project dependencies stay isolated from your system Python:
+
 ```bash
-python3 -m pip install -r requirements.txt
-cp .env.example .env
-# fill in .env with your Jira and BigQuery credentials + GOOGLE_CLOUD_PROJECT
+git clone <your-github-url>
+cd e2e-data-validation-agent
+python3 -m venv .venv
+source .venv/bin/activate       # Windows PowerShell: .venv\\Scripts\\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
 ```
+
+### Configure credentials
+
+Copy the safe template and edit the local file. `.env` is ignored by Git and must never be committed:
+
+```bash
+cp .env.example .env
+```
+
+Set the following values in `.env`:
+
+1. `JIRA_BASE_URL` and one Jira authentication method: `JIRA_EMAIL` plus `JIRA_API_TOKEN` for Cloud, or `JIRA_BEARER_TOKEN` for Data Center.
+2. `BQ_BILLING_PROJECT` and `BQ_LOCATION` for the project and dataset location used by validation queries.
+3. `GOOGLE_CLOUD_PROJECT` and `LLM_MODEL` for Vertex AI, or `LLM_BASE_URL`, `LLM_MODEL`, and `LLM_API_KEY` for another OpenAI-compatible provider.
+4. `VALIDATION_LABEL` and `JIRA_BULK_JQL` to control which tickets the agent scans.
+
+For Vertex AI, authenticate without putting a cloud key in `.env`:
+
+```bash
+gcloud auth application-default login
+```
+
+Keep `SERVER_HOST=127.0.0.1` when running locally. Change it only when the dashboard is placed behind a network access control layer. See the full variable reference below.
+
+### Verify the installation
+
+Run the credential-free checks before connecting the agent to Jira or BigQuery:
+
+```bash
+python -Wall -m compileall -q src tests
+python tests/failure_cases.py
+```
+
+The first command checks imports and syntax. The failure suite exercises dependency failures and approval safety without calling external services.
 
 ## Running
 
@@ -36,6 +90,8 @@ python3 src/main.py --jql "labels = validation-agent"
 # Single ticket
 python3 src/main.py DEMO-123
 ```
+
+The first pass reads the ticket, extracts the requested validation, generates a read-only query, and posts it for review. It does not execute a data query until a reviewer adds an approval comment. A fresh run writes the dashboard and JSON evidence files under `output/`.
 
 Or start the local dashboard server and click **Run Agent**:
 
